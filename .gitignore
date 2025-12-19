@@ -1,0 +1,47 @@
+# Credenciais (NUNCA commitar!)
+credentials.json
+*.json.backup
+.streamlit/secrets.toml
+
+# Ambiente virtual
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Banco de dados local
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Relatórios gerados (opcional)
+# reports/*.html
+# reports/*.txt
+# reports/*.png
+
+# Variáveis de ambiente
+.env
+.env.local

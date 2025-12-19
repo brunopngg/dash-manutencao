@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+/* Cores Equatorial */
+:root {
+  --azul-equatorial: #1a4d8f;
+  --azul-claro: #2d6bb5;
+  --azul-escuro: #0d2e5a;
+}

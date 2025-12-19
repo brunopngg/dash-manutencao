@@ -2,21 +2,48 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recha
 
 const COLORS = ['#0d2e5a', '#1a4d8f', '#2d6bb5', '#4a90d9', '#6bb3fa', '#8ec8ff', '#b1dcff']
 
-const PieChartComponent = ({ data }) => {
+// Label customizado dentro da fatia
+const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, value, name }) => {
+  const RADIAN = Math.PI / 180
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.5
+  const x = cx + radius * Math.cos(-midAngle * RADIAN)
+  const y = cy + radius * Math.sin(-midAngle * RADIAN)
+  
   return (
-    <ResponsiveContainer width="100%" height={350}>
+    <text 
+      x={x} 
+      y={y} 
+      fill="white" 
+      textAnchor="middle" 
+      dominantBaseline="central"
+      fontSize={12}
+      fontWeight="bold"
+    >
+      {value}
+    </text>
+  )
+}
+
+const PieChartComponent = ({ data, compact = false }) => {
+  const height = compact ? 280 : 320
+  const outerRadius = compact ? 90 : 110
+  const innerRadius = compact ? 50 : 60
+  
+  return (
+    <ResponsiveContainer width="100%" height={height}>
       <PieChart>
         <Pie
           data={data}
           cx="50%"
           cy="50%"
-          innerRadius={60}
-          outerRadius={120}
-          paddingAngle={2}
+          innerRadius={innerRadius}
+          outerRadius={outerRadius}
+          paddingAngle={3}
           dataKey="value"
           nameKey="name"
-          label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-          labelLine={{ stroke: '#1a4d8f' }}
+          label={renderCustomLabel}
+          labelLine={false}
+          animationDuration={800}
         >
           {data.map((entry, index) => (
             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -25,9 +52,18 @@ const PieChartComponent = ({ data }) => {
         <Tooltip 
           contentStyle={{ 
             backgroundColor: '#fff', 
-            border: '2px solid #1a4d8f',
-            borderRadius: '8px'
+            border: 'none',
+            borderRadius: '12px',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
           }}
+          formatter={(value, name) => [value, name]}
+        />
+        <Legend 
+          verticalAlign="bottom" 
+          height={36}
+          iconType="circle"
+          iconSize={8}
+          formatter={(value) => <span style={{ color: '#64748b', fontSize: '11px' }}>{value}</span>}
         />
       </PieChart>
     </ResponsiveContainer>

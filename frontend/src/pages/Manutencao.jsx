@@ -75,7 +75,7 @@ const Manutencao = () => {
                   MES: dataObj ? dataObj.getMonth() + 1 : null
                 }
               })
-              .filter(row => row.DATA_SERVICO && row.POLO && row.ANO <= 2026)
+              .filter(row => row.DATA_SERVICO && row.POLO && row.ANO >= 2020 && row.ANO <= 2030)
 
             setData(processedData)
             setLoading(false)
@@ -111,7 +111,8 @@ const Manutencao = () => {
 
   // Opções de filtros
   const filterOptions = useMemo(() => {
-    const anos = [...new Set(data.map(d => d.ANO).filter(Boolean))].sort()
+    // Filtrar apenas anos válidos (entre 2020 e 2030)
+    const anos = [...new Set(data.map(d => d.ANO).filter(ano => ano >= 2020 && ano <= 2030))].sort()
     const polos = [...new Set(data.map(d => d.POLO).filter(Boolean))].sort()
     const equipes = [...new Set(data.map(d => d.EQUIPE).filter(Boolean))].sort()
     return { anos, polos, equipes }
@@ -126,6 +127,52 @@ const Manutencao = () => {
 
     return { total, polosAtivos, equipesAtivas, comBaixa }
   }, [filteredData])
+
+  // Sparkline data (últimos 7 dias)
+  const sparklineData = useMemo(() => {
+    const ultimos7Dias = []
+    const hoje = new Date()
+    
+    for (let i = 6; i >= 0; i--) {
+      const dia = new Date(hoje)
+      dia.setDate(dia.getDate() - i)
+      dia.setHours(0, 0, 0, 0)
+      
+      const count = data.filter(row => {
+        if (!row.DATA_SERVICO) return false
+        const dataRow = new Date(row.DATA_SERVICO)
+        dataRow.setHours(0, 0, 0, 0)
+        return dataRow.getTime() === dia.getTime()
+      }).length
+      
+      ultimos7Dias.push(count)
+    }
+    
+    return ultimos7Dias
+  }, [data])
+
+  // Serviços do dia de hoje por equipe
+  const servicosDoDia = useMemo(() => {
+    const hoje = new Date()
+    hoje.setHours(0, 0, 0, 0)
+    
+    const dadosHoje = data.filter(row => {
+      if (!row.DATA_SERVICO) return false
+      const dataRow = new Date(row.DATA_SERVICO)
+      dataRow.setHours(0, 0, 0, 0)
+      return dataRow.getTime() === hoje.getTime()
+    })
+    
+    const porEquipe = Object.entries(
+      dadosHoje.reduce((acc, row) => {
+        acc[row.EQUIPE] = (acc[row.EQUIPE] || 0) + 1
+        return acc
+      }, {})
+    ).map(([equipe, qtd]) => ({ equipe, qtd }))
+     .sort((a, b) => b.qtd - a.qtd)
+    
+    return { total: dadosHoje.length, porEquipe }
+  }, [data])
 
   // Dados para gráficos
   const chartData = useMemo(() => {
@@ -218,64 +265,97 @@ const Manutencao = () => {
       />
 
       {/* KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <KPICard title="Total de Serviços" value={kpis.total.toLocaleString()} icon="📋" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <KPICard title="Total de Serviços" value={kpis.total.toLocaleString()} icon="📋" sparklineData={sparklineData} />
         <KPICard title="Polos Ativos" value={kpis.polosAtivos} icon="🏢" />
         <KPICard title="Equipes" value={kpis.equipesAtivas} icon="👥" />
         <KPICard title="Com Baixa" value={kpis.comBaixa.toLocaleString()} icon="✅" />
       </div>
 
+      {/* Serviços do Dia */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-base font-bold text-[#0d2e5a] flex items-center gap-2">
+            <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white text-sm">📅</span>
+            Serviços de Hoje
+            <span className="text-xs font-normal text-gray-400">
+              {new Date().toLocaleDateString('pt-BR')}
+            </span>
+          </h2>
+          <span className="text-xl font-bold text-[#1a4d8f] bg-blue-50 px-3 py-1 rounded-lg">{servicosDoDia.total}</span>
+        </div>
+        
+        {servicosDoDia.porEquipe.length > 0 ? (
+          <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2">
+            {servicosDoDia.porEquipe.map(({ equipe, qtd }) => (
+              <div 
+                key={equipe} 
+                className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg p-2 border border-slate-200"
+              >
+                <div className="text-[10px] text-slate-500 truncate font-medium" title={equipe}>{equipe}</div>
+                <div className="text-lg font-bold text-[#0d2e5a]">{qtd}</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-6 text-gray-400">
+            <span className="text-3xl mb-1 block">📭</span>
+            <p className="text-sm">Nenhum serviço hoje</p>
+          </div>
+        )}
+      </div>
+
       {/* Gráficos - Linha 1 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:border-[#1a4d8f] transition-colors">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#1a4d8f] to-[#2d6bb5] flex items-center justify-center">
-              <span className="text-white text-lg">📊</span>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <div className="bg-white rounded-2xl border border-gray-200 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#1a4d8f] to-[#2d6bb5] flex items-center justify-center">
+              <span className="text-white text-sm">📊</span>
             </div>
-            <h3 className="text-lg font-bold text-[#0d2e5a]">Serviços por Polo</h3>
+            <h3 className="text-base font-bold text-[#0d2e5a]">Serviços por Polo</h3>
           </div>
-          <BarChartComponent data={chartData.byPolo} />
+          <BarChartComponent data={chartData.byPolo} compact />
         </div>
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:border-[#1a4d8f] transition-colors">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#1a4d8f] to-[#2d6bb5] flex items-center justify-center">
-              <span className="text-white text-lg">🥧</span>
+        <div className="bg-white rounded-2xl border border-gray-200 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#1a4d8f] to-[#2d6bb5] flex items-center justify-center">
+              <span className="text-white text-sm">🥧</span>
             </div>
-            <h3 className="text-lg font-bold text-[#0d2e5a]">Distribuição por Polo</h3>
+            <h3 className="text-base font-bold text-[#0d2e5a]">Distribuição por Polo</h3>
           </div>
-          <PieChartComponent data={chartData.byPolo} />
+          <PieChartComponent data={chartData.byPolo} compact />
         </div>
       </div>
 
-      {/* Timeline */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-8 hover:border-[#1a4d8f] transition-colors">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#1a4d8f] to-[#2d6bb5] flex items-center justify-center">
-            <span className="text-white text-lg">📅</span>
+      {/* Timeline e Equipes - Lado a lado */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <div className="bg-white rounded-2xl border border-gray-200 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#1a4d8f] to-[#2d6bb5] flex items-center justify-center">
+              <span className="text-white text-sm">📈</span>
+            </div>
+            <h3 className="text-base font-bold text-[#0d2e5a]">Evolução Diária</h3>
           </div>
-          <h3 className="text-lg font-bold text-[#0d2e5a]">Serviços por Data</h3>
+          <LineChartComponent data={chartData.byDate} compact />
         </div>
-        <LineChartComponent data={chartData.byDate} />
-      </div>
-
-      {/* Gráfico de Equipes */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-8 hover:border-[#1a4d8f] transition-colors">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#1a4d8f] to-[#2d6bb5] flex items-center justify-center">
-            <span className="text-white text-lg">👥</span>
+        <div className="bg-white rounded-2xl border border-gray-200 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#1a4d8f] to-[#2d6bb5] flex items-center justify-center">
+              <span className="text-white text-sm">👥</span>
+            </div>
+            <h3 className="text-base font-bold text-[#0d2e5a]">Top 15 Equipes</h3>
           </div>
-          <h3 className="text-lg font-bold text-[#0d2e5a]">Serviços por Equipe (Top 15)</h3>
+          <BarChartComponent data={chartData.byEquipe} compact />
         </div>
-        <BarChartComponent data={chartData.byEquipe} />
       </div>
 
       {/* Tabela */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:border-[#1a4d8f] transition-colors">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#1a4d8f] to-[#2d6bb5] flex items-center justify-center">
-            <span className="text-white text-lg">📋</span>
+      <div className="bg-white rounded-2xl border border-gray-200 p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#1a4d8f] to-[#2d6bb5] flex items-center justify-center">
+            <span className="text-white text-sm">📋</span>
           </div>
-          <h3 className="text-lg font-bold text-[#0d2e5a]">Dados Detalhados</h3>
+          <h3 className="text-base font-bold text-[#0d2e5a]">Dados Detalhados</h3>
         </div>
         <DataTable data={filteredData} />
       </div>
